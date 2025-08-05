@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitoring Penyiraman</title>
+  <meta http-equiv="refresh" content="5"> <!-- Auto reload 5 detik -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #e9f7ef;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+    }
+    .data-box {
+      background-color: #ffffff;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .label {
+      font-weight: bold;
+      color: #333;
+    }
+    .value {
+      font-size: 1.5em;
+      color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sistem Monitoring Penyiraman</h1>
+
+  <div class="data-box">
+    <p class="label">Nilai pH:</p>
+    <p class="value" id="ph">Loading...</p>
+    <p class="label">Status pH:</p>
+    <p class="value" id="ph_label">Loading...</p>
+  </div>
+
+  <div class="data-box">
+    <p class="label">Kelembaban Tanah:</p>
+    <p class="value" id="kelembaban">Loading...</p>
+    <p class="label">Status Kelembaban:</p>
+    <p class="value" id="kelembaban_label">Loading...</p>
+  </div>
+
+  <div class="data-box">
+    <p class="label">Durasi Penyiraman:</p>
+    <p class="value" id="durasi">Loading...</p>
+    <p class="label">Status Relay:</p>
+    <p class="value" id="relay">Loading...</p>
+  </div>
+
+  <script>
+    async function fetchData() {
+      try {
+        const res = await fetch("/api/data");
+        const data = await res.json();
+
+        document.getElementById("ph").textContent = data.ph.toFixed(2);
+        document.getElementById("ph_label").textContent = data.ph_label;
+
+        document.getElementById("kelembaban").textContent = data.kelembaban.toFixed(2) + " %";
+        document.getElementById("kelembaban_label").textContent = data.kelembaban_label;
+
+        document.getElementById("durasi").textContent = data.durasi + " detik";
+        document.getElementById("relay").textContent = data.relay.aktif ? "Aktif" : "Tidak Aktif";
+      } catch (err) {
+        console.error("Gagal mengambil data:", err);
+      }
+    }
+
+    fetchData();
+    setInterval(fetchData, 5000);  // Update otomatis setiap 5 detik
+  </script>
+</body>
+</html>
