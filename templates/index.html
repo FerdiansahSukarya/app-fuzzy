@@ -4,23 +4,42 @@
   <meta charset="UTF-8">
   <title>Monitoring Penyiraman</title>
   <meta http-equiv="refresh" content="5"> <!-- Auto reload 5 detik -->
-  <style>
+    <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
       background-color: #e9f7ef;
-      margin: 0;
-      padding: 20px;
     }
-    h1 {
+    .sidebar {
+      width: 200px;
+      height: 100vh;
+      background-color: #2e7d32;
+      color: white;
+      position: fixed;
+      padding-top: 20px;
+    }
+    .sidebar h2 {
       text-align: center;
-      color: #2e7d32;
+      margin-bottom: 30px;
+    }
+    .sidebar a {
+      display: block;
+      padding: 10px 20px;
+      color: white;
+      text-decoration: none;
+    }
+    .sidebar a:hover {
+      background-color: #1b5e20;
+    }
+    .content {
+      margin-left: 220px;
+      padding: 20px;
     }
     .data-box {
       background-color: #ffffff;
       border-radius: 10px;
       padding: 20px;
       margin: 20px auto;
-      width: 90%;
       max-width: 500px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
@@ -32,30 +51,46 @@
       font-size: 1.5em;
       color: #1b5e20;
     }
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <h1>Sistem Monitoring Penyiraman</h1>
-
-  <div class="data-box">
-    <p class="label">Nilai pH:</p>
-    <p class="value" id="ph">Loading...</p>
-    <p class="label">Status pH:</p>
-    <p class="value" id="ph_label">Loading...</p>
+  <div class="sidebar">
+    <h2>Penyiraman</h2>
+    <a href="/">Home</a>
+    <a href="/riwayat">Riwayat</a>
   </div>
 
-  <div class="data-box">
-    <p class="label">Kelembaban Tanah:</p>
-    <p class="value" id="kelembaban">Loading...</p>
-    <p class="label">Status Kelembaban:</p>
-    <p class="value" id="kelembaban_label">Loading...</p>
-  </div>
+  <div class="content">
+    <h1>Sistem Monitoring Penyiraman</h1>
 
-  <div class="data-box">
-    <p class="label">Durasi Penyiraman:</p>
-    <p class="value" id="durasi">Loading...</p>
-    <p class="label">Status Relay:</p>
-    <p class="value" id="relay">Loading...</p>
+    <div class="data-box">
+      <p class="label">Nilai pH:</p>
+      <p class="value" id="ph">Loading...</p>
+      <p class="label">Status pH:</p>
+      <p class="value" id="ph_label">Loading...</p>
+    </div>
+
+    <div class="data-box">
+      <p class="label">Kelembaban Tanah:</p>
+      <p class="value" id="kelembaban">Loading...</p>
+      <p class="label">Status Kelembaban:</p>
+      <p class="value" id="kelembaban_label">Loading...</p>
+    </div>
+
+    <div class="data-box">
+      <p class="label">Durasi Penyiraman:</p>
+      <p class="value" id="durasi">Loading...</p>
+      <div id="relay_box">
+        <p class="label">Status Relay:</p>
+        <p class="value" id="relay">Loading...</p>
+      </div>
+    <button id="btn-on">Nyalakan Relay</button>
+<button id="btn-off">Matikan Relay</button>
+<p>Status Relay Manual: <span id="manual-status">OFF</span></p>
+
   </div>
 
   <script>
@@ -67,8 +102,8 @@
         document.getElementById("ph").textContent = data.ph.toFixed(2);
         document.getElementById("ph_label").textContent = data.ph_label;
 
-        document.getElementById("kelembaban").textContent = data.kelembaban.toFixed(2) + " %";
-        document.getElementById("kelembaban_label").textContent = data.kelembaban_label;
+        document.getElementById("kelembaban").textContent = data.kelembaban_persen.toFixed(2) + " %";
+        document.getElementById("kelembaban_label").textContent = data.kelembaban_status;
 
         document.getElementById("durasi").textContent = data.durasi + " detik";
         document.getElementById("relay").textContent = data.relay.aktif ? "Aktif" : "Tidak Aktif";
@@ -76,7 +111,22 @@
         console.error("Gagal mengambil data:", err);
       }
     }
+    async function kirimPerintah(action) {
+    const res = await fetch("/api/relay/manual", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({action})
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        alert("Gagal: " + data.error);
+        return;
+    }
+    document.getElementById("manual-status").textContent = data.relay_status ? "ON" : "OFF";
+}
 
+document.getElementById("btn-on").onclick = () => kirimPerintah("on");
+document.getElementById("btn-off").onclick = () => kirimPerintah("off");
     fetchData();
     setInterval(fetchData, 5000);  // Update otomatis setiap 5 detik
   </script>

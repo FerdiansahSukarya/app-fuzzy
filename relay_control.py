@@ -1,38 +1,37 @@
-# relay_control.py
-
-import time
-import threading
 import subprocess
+import signal
 
-relay_status = {
-    "aktif": False,
-    "waktu_mulai": None,
-    "durasi": 0
-}
+class RelayControl:
+    def __init__(self):
+        self.process = None
 
-def siram_air(durasi_detik):
-    if relay_status["aktif"]:
-        print("[RELAY CONTROL] Relay sedang aktif, abaikan perintah baru.")
-        return
+    def start_relay(self):
+        if self.process is None or self.process.poll() is not None:
+            # Jalankan relay.py sebagai proses baru
+            self.process = subprocess.Popen(['python3', 'relay.py'])
+            return True
+        else:
+            # Relay sudah berjalan
+            return False
 
-    def tugas():
-        print(f"[RELAY CONTROL] Menyalakan relay selama {durasi_detik} detik")
-        relay_status["aktif"] = True
-        relay_status["waktu_mulai"] = time.time()
-        relay_status["durasi"] = durasi_detik
+    def stop_relay(self):
+        if self.process and self.process.poll() is None:
+            # Hentikan proses relay.py dengan sinyal SIGINT
+            self.process.send_signal(signal.SIGINT)
+            self.process.wait()
+            self.process = None
+            return True
+        else:
+            # Relay sudah tidak berjalan
+            return False
 
-        subprocess.run(["python3", "relay.py"])  # ?? NYALAKAN RELAY
-        time.sleep(durasi_detik)
-        subprocess.run(["python3", "matikan_gpio.py"])  # ? MATIKAN RELAY
+    def is_running(self):
+        return self.process is not None and self.process.poll() is None
 
-        relay_status["aktif"] = False
-        relay_status["waktu_mulai"] = None
-        relay_status["durasi"] = 0
-        print("[RELAY CONTROL] Relay dimatikan")
 
-    thread = threading.Thread(target=tugas)
-    thread.daemon = True
-    thread.start()
-
-def get_status_relay():
-    return relay_status.copy()
+# Test manual (optional)
+if __name__ == '__main__':
+    rc = RelayControl()
+    rc.start_relay()
+    input("Tekan Enter untuk stop relay...")
+    rc.stop_relay()
