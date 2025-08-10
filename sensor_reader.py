@@ -42,9 +42,9 @@ except Exception as e:
 
 def label_kelembaban(nilai_adc):
     """Konversi nilai ADC ke label kelembaban sesuai dokumen."""
-    if nilai_adc > 800:
+    if nilai_adc > 450:
         return "Kering"
-    elif nilai_adc > 400:
+    elif nilai_adc > 350:
         return "Lembab"
     else:
         return "Basah"

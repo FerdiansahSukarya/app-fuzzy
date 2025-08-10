@@ -1,37 +1,27 @@
 import subprocess
-import signal
+import threading
 
-class RelayControl:
-    def __init__(self):
-        self.process = None
+process = None
+lock = threading.Lock()
 
-    def start_relay(self):
-        if self.process is None or self.process.poll() is not None:
-            # Jalankan relay.py sebagai proses baru
-            self.process = subprocess.Popen(['python3', 'relay.py'])
-            return True
-        else:
-            # Relay sudah berjalan
+def start_relay():
+    global process
+    with lock:
+        if process is not None and process.poll() is None:
+            print("Relay sudah ON, tidak menyalakan ulang")
             return False
+        process = subprocess.Popen(["python3", "relay.py"])
+        print("Relay menyala (relay.py dijalankan)")
+        return True
 
-    def stop_relay(self):
-        if self.process and self.process.poll() is None:
-            # Hentikan proses relay.py dengan sinyal SIGINT
-            self.process.send_signal(signal.SIGINT)
-            self.process.wait()
-            self.process = None
-            return True
-        else:
-            # Relay sudah tidak berjalan
+def stop_relay():
+    global process
+    with lock:
+        if process is None or process.poll() is not None:
+            print("Relay sudah OFF, tidak menonaktifkan ulang")
             return False
-
-    def is_running(self):
-        return self.process is not None and self.process.poll() is None
-
-
-# Test manual (optional)
-if __name__ == '__main__':
-    rc = RelayControl()
-    rc.start_relay()
-    input("Tekan Enter untuk stop relay...")
-    rc.stop_relay()
+        process.terminate()
+        process.wait()
+        process = None
+        print("Relay mati (proses relay.py dihentikan)")
+        return True

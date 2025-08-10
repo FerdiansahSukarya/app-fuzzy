@@ -32,6 +32,23 @@ def simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kele
     }
     supabase.table("relay").insert(data).execute()
 
+def simpan_relay_log_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, aksi, relay_status):
+    data = {
+        "ph": ph,
+        "ph_status": ph_status,
+        "kelembaban_adc": kelembaban_adc,
+        "kelembaban_persen": kelembaban_persen,
+        "kelembaban_status": kelembaban_status,
+        "durasi": durasi,
+        "aksi": aksi,
+        "relay_status": relay_status
+    }
+    response = supabase.table("relay").insert(data).execute()
+    if response.status_code != 201:
+        # 201 Created adalah status sukses insert
+        raise Exception(f"Supabase insert failed with status {response.status_code}: {response.data}")
+
+
 def simpan_fuzzy_log_supabase(ph, ph_status, kelembaban, kelembaban_status, durasi, relay_status):
     now = datetime.now().isoformat()
 

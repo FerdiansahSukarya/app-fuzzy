@@ -1,24 +1,8 @@
-# fuzzy.py
-import time
 import threading
-from datetime import datetime
-from relay_control import RelayControl
+import time
+from relay_control import start_relay, stop_relay
 from database import simpan_relay_mysql
 from supabase_client import simpan_relay_supabase
-
-
-relay_ctrl = RelayControl()
-
-def siram_air(durasi):
-    def worker():
-        if relay_ctrl.start_relay():
-            print(f"Relay ON selama {durasi} detik")
-            time.sleep(durasi)
-            relay_ctrl.stop_relay()
-            print("Relay OFF setelah durasi")
-        else:
-            print("Relay sudah ON, tidak menyalakan ulang")
-    threading.Thread(target=worker, daemon=True).start()
 
 def label_ph(ph):
     if ph < 4.4:
@@ -34,39 +18,46 @@ def label_ph(ph):
     else:
         return "Tidak Terdefinisi"
 
-def label_kelembaban(nilai_adc):
-    if nilai_adc > 800:
+def label_kelembaban(adc):
+    if adc > 800:
         return "Kering"
-    elif nilai_adc > 400:
+    elif adc > 400:
         return "Lembab"
     else:
         return "Basah"
 
+# Aturan fuzzy berdasarkan R1-R15:
+# Jika perlu siram, durasi siram 15 detik, jika tidak perlu siram durasi 0
 def fuzzy_rules(ph_label, kelembaban_label):
-    rules = {
-        ("Sangat Masam", "Kering"): 900,
-        ("Masam", "Kering"): 900,
-        ("Sedikit Masam", "Kering"): 900,
-        ("Netral", "Kering"): 900,
-        ("Basa", "Kering"): 900,
+    siram_conditions = {
+        ("Sangat Masam", "Kering"),
+        ("Masam", "Kering"),
+        ("Sedikit Masam", "Kering"),
+        ("Netral", "Kering"),
+        ("Basa", "Kering"),
 
-        ("Sangat Masam", "Lembab"): 900,
-        ("Masam", "Lembab"): 0,
-        ("Sedikit Masam", "Lembab"): 0,
-        ("Netral", "Lembab"): 0,
-        ("Basa", "Lembab"): 0,
-
-        ("Sangat Masam", "Basah"): 0,
-        ("Masam", "Basah"): 0,
-        ("Sedikit Masam", "Basah"): 0,
-        ("Netral", "Basah"): 0,
-        ("Basa", "Basah"): 0
+        ("Sangat Masam", "Lembab"),
+        ("Masam", "Lembab"),
+        ("Sedikit Masam", "Lembab"),
+        ("Netral", "Lembab"),
+        ("Basa", "Lembab"),
     }
-    return rules.get((ph_label, kelembaban_label), 0)
+    if (ph_label, kelembaban_label) in siram_conditions:
+        return 15
+    else:
+        return 0
 
-def waktu_sesuai_jadwal():
-    now = datetime.now()
-    return now.minute == 0
+
+def siram_air(durasi):
+    def worker():
+        if start_relay():
+            print(f"Relay ON selama {durasi} detik")
+            time.sleep(durasi)
+            stop_relay()
+            print("Relay OFF setelah durasi")
+        else:
+            print("Relay sudah ON, tidak menyalakan ulang")
+    threading.Thread(target=worker, daemon=True).start()
 
 def evaluasi_fuzzy(ph, kelembaban_adc):
     ph_status = label_ph(ph)
@@ -75,22 +66,15 @@ def evaluasi_fuzzy(ph, kelembaban_adc):
 
     durasi = fuzzy_rules(ph_status, kelembaban_status)
 
-    print(f"[FUZZY] pH: {ph} -> {ph_status}, Kelembaban ADC: {kelembaban_adc} -> {kelembaban_status} ({kelembaban_persen}%)")
-    print(f"[FUZZY] Durasi yang diusulkan: {durasi} detik")
-
-    if waktu_sesuai_jadwal():
-        if durasi > 0:
-            print(f"[FUZZY] Menyiram selama {durasi} detik...")
-            siram_air(durasi)
-            simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
-            simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
-        else:
-            print("[FUZZY] Jadwal penyiraman, tapi aturan fuzzy menyatakan TIDAK SIRAM.")
-            simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
-            simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
+    if durasi > 0:
+        print(f"[FUZZY] Aturan mengatakan SIRAM selama {durasi} detik (pH: {ph_status}, Kelembaban: {kelembaban_status})")
+        siram_air(durasi)
+        simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
+        simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
     else:
-        print("[FUZZY] Bukan waktu penyiraman.")
-        durasi = 0
+        print(f"[FUZZY] Aturan mengatakan TIDAK SIRAM (pH: {ph_status}, Kelembaban: {kelembaban_status})")
+        simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
+        simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
 
     return {
         "ph": ph,

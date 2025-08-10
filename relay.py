@@ -1,18 +1,24 @@
 import RPi.GPIO as GPIO
+import signal
+import sys
+import time
 
-# Konfigurasi GPIO
-RELAY_PIN = 17  # Ganti sesuai pin GPIO yang kamu pakai
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(RELAY_PIN, GPIO.OUT)
+PIN_RELAY = 17  # Ganti sesuai GPIO kamu
 
-try:
-    print("Pompa hidup (relay ON)...")
-    GPIO.output(RELAY_PIN, GPIO.LOW)  # Relay aktif (ON)
-    input("Tekan Enter untuk mematikan pompa...")  # Tunggu input user
-    GPIO.output(RELAY_PIN, GPIO.HIGH) # Relay mati (OFF)
-    print("Pompa dimatikan.")
-except KeyboardInterrupt:
-    print("Dihentikan oleh pengguna.")
-finally:
-    GPIO.output(RELAY_PIN, GPIO.HIGH)
+def cleanup(signal_received, frame):
+    GPIO.output(PIN_RELAY, GPIO.HIGH)
     GPIO.cleanup()
+    print("Relay dimatikan, keluar program")
+    sys.exit(0)
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(PIN_RELAY, GPIO.OUT)
+GPIO.output(PIN_RELAY, GPIO.LOW)  # Relay ON (aktif LOW)
+
+signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
+
+print("Relay menyala. Tunggu perintah stop...")
+
+while True:
+    time.sleep(1)  # Tunggu sampai dihentikan oleh relay_control.py

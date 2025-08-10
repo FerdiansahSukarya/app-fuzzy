@@ -101,7 +101,7 @@
           <th>Status pH</th>
           <th>Kelembaban</th>
           <th>Status Kelembaban</th>
-          <th>Durasi (detik)</th>
+          <th>Aktuator</th> 
         </tr>
       </thead>
       <tbody id="riwayat-body">
@@ -119,17 +119,18 @@
         tbody.innerHTML = "";
 
         data.forEach(row => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${new Date(row.waktu).toLocaleString()}</td>
-            <td>${row.ph.toFixed(2)}</td>
-            <td>${row.ph_status}</td>
-            <td>${row.kelembaban.toFixed(2)}</td>
-            <td>${row.kelembaban_status}</td>
-            <td>${row.durasi}</td>
-          `;
-          tbody.appendChild(tr);
-        });
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>${new Date(row.waktu).toLocaleString()}</td>
+    <td>${row.ph.toFixed(2)}</td>
+    <td>${row.ph_status}</td>
+    <td>${row.kelembaban.toFixed(2)}</td>
+    <td>${row.kelembaban_status}</td>
+    <td>${row.aksi}</td>
+  `;
+  tbody.appendChild(tr);
+});
+
       } catch (err) {
         console.error("Gagal mengambil data riwayat:", err);
       }

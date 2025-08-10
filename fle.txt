@@ -1,0 +1,93 @@
+def fuzzy_loop():
+    global hasil_terakhir
+
+    status_relay_sebelumnya = False
+
+    while True:
+        ph_value, ph_label = baca_ph()
+        kelembaban_adc, kelembaban_persen, kelembaban_label = baca_kelembaban()
+
+        # Simpan data sensor ke DB MySQL
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO sensor (ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (ph_value, ph_label, kelembaban_adc, kelembaban_persen, kelembaban_label))
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            try:
+                simpan_sensor_supabase(
+                ph=ph_value,
+                ph_status=ph_label,
+                kelembaban_adc=kelembaban_adc,
+                kelembaban_persen=kelembaban_persen,
+                kelembaban_status=kelembaban_label
+                )
+            except Exception as e:
+                print(f"[ERROR] Gagal simpan data sensor ke Supabase: {e}")
+    
+        except Exception as e:
+            print(f"[ERROR] Gagal simpan data sensor: {e}")
+
+        hasil = evaluasi_fuzzy(ph_value, kelembaban_adc)
+        hasil["ph_label"] = ph_label
+        hasil["kelembaban_persen"] = kelembaban_persen
+        hasil["kelembaban_status"] = kelembaban_label
+
+        hasil_terakhir = hasil
+
+        status_relay_saat_ini = hasil["durasi"] > 0
+
+        if status_relay_saat_ini and not status_relay_sebelumnya:
+            # Jalankan relay
+            siram_air(hasil["durasi"])
+            print(f"[RELAY] Menyiram {hasil['durasi']} detik")
+
+            # Simpan log relay ON
+            try:
+                cursor.execute("""
+                    INSERT INTO relay (ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, aksi, relay_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (ph_value, ph_label, kelembaban_adc, kelembaban_persen, kelembaban_label, hasil["durasi"], "SIRAM", 1))
+                conn.commit()
+            except Exception as e:
+                print(f"[ERROR] Gagal simpan log relay ON: {e}")
+        elif not status_relay_saat_ini and status_relay_sebelumnya:
+            print("[RELAY] Tidak menyiram")
+
+            # Simpan log relay OFF
+            try:
+                cursor.execute("""
+                    INSERT INTO relay (ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, aksi, relay_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (ph_value, ph_label, kelembaban_adc, kelembaban_persen, kelembaban_label, 0, "TIDAK SIRAM", 0))
+                conn.commit()
+            except Exception as e:
+                print(f"[ERROR] Gagal simpan log relay OFF: {e}")
+
+        if status_relay_saat_ini != status_relay_supabase_sebelumnya:
+            try:
+                simpan_fuzzy_log_supabase(
+                    hasil["ph"],
+                    hasil["ph_status"],
+                    hasil["kelembaban"],
+                    hasil["kelembaban_status"],
+                    hasil["durasi"],
+                    status_relay_saat_ini
+                )
+                print(f"[SUPABASE] Log disimpan (relay {'ON' if status_relay_saat_ini else 'OFF'})")
+                status_relay_supabase_sebelumnya = status_relay_saat_ini
+            except Exception as e:
+                print(f"[ERROR] Gagal simpan log relay ke Supabase: {e}")
+
+        status_relay_sebelumnya = status_relay_saat_ini
+
+        cursor.close()
+        conn.close()
+    
+
+        time.sleep(10)
