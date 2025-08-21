@@ -1,8 +1,8 @@
 import threading
 import time
 from relay_control import start_relay, stop_relay
-from database import simpan_relay_mysql
-from supabase_client import simpan_relay_supabase
+from supabase_client import simpan_fuzzy_log_supabase
+
 
 def label_ph(ph):
     if ph < 4.4:
@@ -26,8 +26,6 @@ def label_kelembaban(adc):
     else:
         return "Basah"
 
-# Aturan fuzzy berdasarkan R1-R15:
-# Jika perlu siram, durasi siram 15 detik, jika tidak perlu siram durasi 0
 def fuzzy_rules(ph_label, kelembaban_label):
     siram_conditions = {
         ("Sangat Masam", "Kering"),
@@ -43,10 +41,9 @@ def fuzzy_rules(ph_label, kelembaban_label):
         ("Basa", "Lembab"),
     }
     if (ph_label, kelembaban_label) in siram_conditions:
-        return 15
+        return 900
     else:
         return 0
-
 
 def siram_air(durasi):
     def worker():
@@ -60,27 +57,43 @@ def siram_air(durasi):
     threading.Thread(target=worker, daemon=True).start()
 
 def evaluasi_fuzzy(ph, kelembaban_adc):
-    ph_status = label_ph(ph)
-    kelembaban_status = label_kelembaban(kelembaban_adc)
-    kelembaban_persen = max(0, min(100, round((1023 - kelembaban_adc) / 1023 * 100, 2)))
+    try:
+        # Label kondisi
+        ph_status = label_ph(ph)
+        kelembaban_status = label_kelembaban(kelembaban_adc)
+        kelembaban_persen = max(0, min(100, round((1023 - kelembaban_adc) / 1023 * 100, 2)))
 
-    durasi = fuzzy_rules(ph_status, kelembaban_status)
+        # Evaluasi aturan fuzzy
+        durasi = fuzzy_rules(ph_status, kelembaban_status)
 
-    if durasi > 0:
-        print(f"[FUZZY] Aturan mengatakan SIRAM selama {durasi} detik (pH: {ph_status}, Kelembaban: {kelembaban_status})")
-        siram_air(durasi)
-        simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
-        simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, "SIRAM", 1)
-    else:
-        print(f"[FUZZY] Aturan mengatakan TIDAK SIRAM (pH: {ph_status}, Kelembaban: {kelembaban_status})")
-        simpan_relay_mysql(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
-        simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, 0, "TIDAK SIRAM", 0)
+        # Simpan log evaluasi ke Supabase
+        simpan_fuzzy_log_supabase(
+            ph,
+            ph_status,
+            kelembaban_persen,
+            kelembaban_status,
+            1 if durasi > 0 else 0
+        )
 
-    return {
-        "ph": ph,
-        "ph_status": ph_status,
-        "kelembaban_adc": kelembaban_adc,
-        "kelembaban_persen": kelembaban_persen,
-        "kelembaban_status": kelembaban_status,
-        "durasi": durasi
-    }
+        # Return hasil evaluasi
+        return {
+            "ph": ph,
+            "ph_status": ph_status,
+            "kelembaban": kelembaban_adc,
+            "kelembaban_persen": kelembaban_persen,
+            "kelembaban_status": kelembaban_status,
+            "durasi": durasi
+        }
+
+    except Exception as e:
+        print(f"[ERROR] evaluasi_fuzzy gagal: {e}")
+        # Tetap return dictionary default agar loop utama tidak error
+        return {
+            "ph": ph,
+            "ph_status": "Error",
+            "kelembaban": kelembaban_adc,
+            "kelembaban_persen": 0,
+            "kelembaban_status": "Error",
+            "durasi": 0
+        }
+

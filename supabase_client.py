@@ -1,85 +1,33 @@
 from supabase import create_client, Client
 from datetime import datetime
-import os
 
-url = "https://siosiigonlauesjlafbq.supabase.co"  # Ganti sesuai milikmu
+# Ganti URL dan API Key sesuai kredensial
+url = "https://siosiigonlauesjlafbq.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpb3NpaWdvbmxhdWVzamxhZmJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTQ3ODUyMCwiZXhwIjoyMDY1MDU0NTIwfQ.7zdvu5Ltjr7J2SrHa4WmfFfxphmGxtTwHezvz1lEJpc"
-  # Ganti sesuai milikmu
-
 
 supabase: Client = create_client(url, key)
 
-def simpan_sensor_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status):
-    data = {
-        "ph": ph,
-        "ph_status": ph_status,
-        "kelembaban_adc": kelembaban_adc,
-        "kelembaban_persen": kelembaban_persen,
-        "kelembaban_status": kelembaban_status
-    }
-    supabase.table("sensor").insert(data).execute()
-
-def simpan_relay_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, aksi, relay_status):
-    data = {
-        "ph": ph,
-        "ph_status": ph_status,
-        "kelembaban_adc": kelembaban_adc,
-        "kelembaban_persen": kelembaban_persen,
-        "kelembaban_status": kelembaban_status,
-        "durasi": durasi,
-        "aksi": aksi,
-        "relay_status": relay_status
-    }
-    supabase.table("relay").insert(data).execute()
-
-def simpan_relay_log_supabase(ph, ph_status, kelembaban_adc, kelembaban_persen, kelembaban_status, durasi, aksi, relay_status):
-    data = {
-        "ph": ph,
-        "ph_status": ph_status,
-        "kelembaban_adc": kelembaban_adc,
-        "kelembaban_persen": kelembaban_persen,
-        "kelembaban_status": kelembaban_status,
-        "durasi": durasi,
-        "aksi": aksi,
-        "relay_status": relay_status
-    }
-    response = supabase.table("relay").insert(data).execute()
-    if response.status_code != 201:
-        # 201 Created adalah status sukses insert
-        raise Exception(f"Supabase insert failed with status {response.status_code}: {response.data}")
-
-
-def simpan_fuzzy_log_supabase(ph, ph_status, kelembaban, kelembaban_status, durasi, relay_status):
+def simpan_fuzzy_log_supabase(ph, status_ph, kelembaban, status_kelembaban, relay_status):
+    """
+    Simpan data log fuzzy ke tabel Supabase 'fuzzy_log'.
+    Semua siklus tercatat, baik menyiram maupun tidak.
+    """
     now = datetime.now().isoformat()
 
-    # Cek entri terakhir
-    response = supabase.table("fuzzy_log") \
-        .select("*") \
-        .order("waktu", desc=True) \
-        .limit(1) \
-        .execute()
-
-    if response.data:
-        last = response.data[0]
-        # Jika sama dan masih dalam 5 detik, skip
-        if (
-            last["ph"] == ph and
-            last["kelembaban"] == kelembaban and
-            last["durasi"] == durasi and
-            last["relay_status"] == relay_status
-        ):
-            return  # Skip insert
-
-    # Kirim data baru
     data = {
         "waktu": now,
         "ph": ph,
-        "ph_status": ph_status,
+        "status_ph": status_ph,
         "kelembaban": kelembaban,
-        "kelembaban_status": kelembaban_status,
-        "durasi": durasi,
-        "relay_status": relay_status
+        "status_kelembaban": status_kelembaban,
+        "relay": relay_status,  # "ON" atau "OFF"
     }
-    supabase.table("fuzzy_log").insert(data).execute()
 
-
+    try:
+        insert_response = supabase.table("fuzzy_log").insert(data).execute()
+        if insert_response.data:
+            print("[Supabase] Insert berhasil:", insert_response.data)
+        else:
+            print("[Supabase] Insert gagal atau tidak ada data tersimpan.")
+    except Exception as e:
+        print(f"[Supabase] Gagal insert data: {e}")

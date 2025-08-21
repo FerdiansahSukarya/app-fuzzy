@@ -27,7 +27,6 @@ def stop_relay():
         return True
 
 def get_status_relay():
-    """Mengembalikan True jika relay.py sedang berjalan, False jika tidak."""
     global process
     with lock:
         return process is not None and process.poll() is None
